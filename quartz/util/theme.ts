@@ -85,13 +85,66 @@ function formatFontSpecification(
   return spec.name
 }
 
+type MergedFont = { name: string; weights: Set<number>; italic: boolean }
+
+function mergeFontSpec(
+  map: Map<string, MergedFont>,
+  type: "title" | "header" | "body" | "code",
+  spec: FontSpecification,
+) {
+  const normalized = typeof spec === "string" ? { name: spec } : spec
+  const defaultWeights = type === "header" || type === "title" ? [400, 700] : [400, 600]
+  const weights = normalized.weights ?? defaultWeights
+  const italic = normalized.includeItalic ?? type === "body"
+
+  const existing = map.get(normalized.name)
+  if (existing) {
+    for (const weight of weights) {
+      existing.weights.add(weight)
+    }
+    existing.italic = existing.italic || italic
+  } else {
+    map.set(normalized.name, { name: normalized.name, weights: new Set(weights), italic })
+  }
+}
+
+function formatMergedFont(font: MergedFont): string {
+  const weights = [...font.weights].sort((a, b) => a - b)
+  const features: string[] = []
+
+  if (font.italic) {
+    features.push("ital")
+  }
+
+  if (weights.length > 1) {
+    const weightSpec = font.italic
+      ? weights
+          .flatMap((w) => [`0,${w}`, `1,${w}`])
+          .sort()
+          .join(";")
+      : weights.join(";")
+
+    features.push(`wght@${weightSpec}`)
+  }
+
+  return features.length > 0 ? `${font.name}:${features.join(",")}` : font.name
+}
+
+// Sama fondinime ei tohi Google Fontsi paringus kaks korda esineda - API lukkab
+// sellise paringu tagasi ja siis ei jouaks lehele uhtegi fonti. Seeparast
+// liidame samanimelised perekonnad kokku ja kodeerime parameetrid korrektselt.
 export function googleFontHref(theme: Theme) {
   const { header, body, code } = theme.typography
-  const headerFont = formatFontSpecification("header", header)
-  const bodyFont = formatFontSpecification("body", body)
-  const codeFont = formatFontSpecification("code", code)
+  const merged = new Map<string, MergedFont>()
+  mergeFontSpec(merged, "header", header)
+  mergeFontSpec(merged, "body", body)
+  mergeFontSpec(merged, "code", code)
 
-  return `https://fonts.googleapis.com/css2?family=${headerFont}&family=${bodyFont}&family=${codeFont}&display=swap`
+  const params = [...merged.values()]
+    .map((font) => `family=${encodeURIComponent(formatMergedFont(font))}`)
+    .join("&")
+
+  return `https://fonts.googleapis.com/css2?${params}&display=swap`
 }
 
 export function googleFontSubsetHref(theme: Theme, text: string) {

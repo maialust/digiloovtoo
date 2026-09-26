@@ -1,3 +1,10 @@
 @use "./variables.scss" as *;
 
 // put your custom CSS here!
+
+// Caladeal on ainult kaalud 400 ja 700. Valjatostekasti (callout) pealkiri
+// kusis kaalu 600, mida fondis ei ole, mistottu brauser sunteesis ise
+// vahepealse variandi ja pealkiri nagi teistsugune valja. 700 on paris olemas.
+.callout-title .callout-title-inner {
+  font-weight: 700;
+}
